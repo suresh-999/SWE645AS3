@@ -1,0 +1,65 @@
+// Group Members:
+//  Suresh Ande  (G01381683)
+//  Chandrashakar Gudipally (G01410349)
+//  Abhishek Darana ( G01408181) 
+//  Anjan kumar sripati panditaradhyula (G01407403)
+
+// demo
+
+
+pipeline {
+    agent any
+    environment {
+        DOCKERHUB_PASS = credentials('dockerhubcred')
+        DOCKER_TAG = "latest"
+        def dateTag = new Date().format("yyyyMMdd-HHmmss")
+    }
+    stages {
+      stage("Building the Student Survey Image") {
+             
+             steps {
+                script {
+                    checkout scm
+                    sh 'pwd'
+                    sh 'ls -al' // List current directory to debug
+
+                    // Build the JAR file (assuming Maven)
+                    sh 'mvn clean package -DskipTests' // Adjust if your build directory or commands differ
+                    
+                    sh 'ls -al target/' // Assuming JAR is in the target directory
+
+                    // Log in to DockerHub with credentials stored in Jenkins
+                    withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                        sh "echo \$DOCKERHUB_PASS | docker login --username \$DOCKERHUB_USER --password-stdin"
+                    
+                        // Build the Docker image using the specified Dockerfile and tag it
+                        dir('SWE645AS3') { // Adjust this if your Dockerfile is in a different directory
+                            def customImage = docker.build("suresh999/swe645as3:${env.dateTag}", ".")
+                        }
+                    }
+                }
+            }
+             
+             
+             
+                  }
+
+        stage("Pushing Image to DockerHub") {
+            steps {
+                script {
+                    sh "docker push suresh999/swe645as3:${dateTag}"
+                }
+            }
+        }
+        stage("Deploying to Rancher as single pod") {
+            steps {                                  
+                  sh 'kubectl set image deployment/studentsurvey-pipeline container-0=suresh999/swe645as3:${dateTag} -n default'         
+            }
+        }
+        stage("Deploying to Rancher with load balancer") {
+            steps { 
+                sh 'kubectl set image deployment/studentsurvey-lb container-0=suresh999/swe645as3:${dateTag} -n default'
+            }
+        }
+    }
+}
