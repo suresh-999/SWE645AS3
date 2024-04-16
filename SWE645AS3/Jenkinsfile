@@ -4,22 +4,21 @@
 // Abhishek Darana (G01408181)
 // Anjan kumar sripati panditaradhyula (G01407403)
 
-// demo
+// Demo
 
 pipeline {
     agent any
+
     environment {
-        // Environment variables for Docker credentials
-        DOCKERHUB_CRED_ID = 'dockerhubcred' // The ID of the Docker credentials in Jenkins
-        // Docker image tag based on the current timestamp
+        // Set the Docker Hub credentials ID
+        DOCKERHUB_CRED_ID = 'dockerhubcred'
+        // Define the image name and tag
+        IMAGE_NAME = 'swe645as3'
         IMAGE_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        // Docker image repository name
-        IMAGE_REPO = 'swe645as3'
-        // Docker Hub username environment variable
-        DOCKERHUB_USER = ''
-        // Docker Hub password environment variable
-        DOCKERHUB_PASS = ''
+        // Define the Docker registry
+        DOCKER_REGISTRY = 'suresh999'
     }
+
     stages {
         stage('Checkout Code') {
             steps {
@@ -40,7 +39,8 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
                         sh "echo $DOCKERHUB_PASS | docker login --username $DOCKERHUB_USER --password-stdin"
-                        sh "docker build -t ${IMAGE_REPO}:${IMAGE_TAG} ."
+                        // Point to the Dockerfile inside the SWE645AS3 directory
+                        sh "docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f SWE645AS3/Dockerfile SWE645AS3"
                     }
                 }
             }
@@ -50,7 +50,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
-                        sh "docker push ${IMAGE_REPO}:${IMAGE_TAG}"
+                        sh "docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
                     }
                 }
             }
@@ -59,16 +59,18 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Assuming you have 'kubectl' installed and configured on your Jenkins agent
-                    sh "kubectl set image deployment/studentsurvey ${IMAGE_REPO}=${IMAGE_REPO}:${IMAGE_TAG} --record"
-                    // Replace 'studentsurvey' with your actual deployment name
+                    // Update the Kubernetes deployment with the new image
+                    // Ensure that kubectl is configured to communicate with your Kubernetes cluster
+                    sh "kubectl set image deployment/my-deployment my-container=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} --record"
+                    // Replace "my-deployment" and "my-container" with your actual deployment and container names
                 }
             }
         }
     }
+
     post {
         always {
-            // Log out from Docker Hub
+            // Logout from Docker after the build process
             sh "docker logout"
         }
     }
