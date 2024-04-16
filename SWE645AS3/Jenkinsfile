@@ -58,12 +58,12 @@ pipeline {
 
          stage("Deploying to Rancher as single pod") {
             steps {                                  
-                  sh 'kubectl set image deployment/studentsurvey-pipeline container-0=suresh999/studentsurvey645:${dateTag} -n default'         
+                  sh 'kubectl set image deployment/studentsurvey-pipeline container-0=suresh999/studentsurvey645:${IMAGE_TAG} -n default'         
             }
         }
         stage("Deploying to Rancher with load balancer") {
             steps { 
-                sh 'kubectl set image deployment/studentsurvey-lb container-0=suresh999/studentsurvey645:${dateTag} -n default'
+                sh 'kubectl set image deployment/studentsurvey-lb container-0=suresh999/studentsurvey645:${IMAGE_TAG} -n default'
             }
         }
     }
