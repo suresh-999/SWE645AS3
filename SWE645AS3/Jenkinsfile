@@ -23,7 +23,9 @@ pipeline {
 
         stage('Build JAR') {
             steps {
+               dir('SWE645AS3') {
                 sh 'mvn clean package -DskipTests'
+               }
             }
         }
 
