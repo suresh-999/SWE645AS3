@@ -56,14 +56,14 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    // Update the Kubernetes deployment with the new image
-                    // Ensure that kubectl is configured to communicate with your Kubernetes cluster
-                    sh "kubectl set image deployment/my-deployment my-container=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} --record"
-                    // Replace "my-deployment" and "my-container" with your actual deployment and container names
-                }
+         stage("Deploying to Rancher as single pod") {
+            steps {                                  
+                  sh 'kubectl set image deployment/studentsurvey-pipeline container-0=suresh999/studentsurvey645:${dateTag} -n default'         
+            }
+        }
+        stage("Deploying to Rancher with load balancer") {
+            steps { 
+                sh 'kubectl set image deployment/studentsurvey-lb container-0=suresh999/studentsurvey645:${dateTag} -n default'
             }
         }
     }
