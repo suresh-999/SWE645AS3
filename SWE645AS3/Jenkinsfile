@@ -1,39 +1,46 @@
 // Group Members:
-//  Suresh Ande  (G01381683)
-//  Chandrashakar Gudipally (G01410349)
-//  Abhishek Darana ( G01408181) 
-//  Anjan kumar sripati panditaradhyula (G01407403)
+// Suresh Ande (G01381683)
+// Chandrashakar Gudipally (G01410349)
+// Abhishek Darana (G01408181)
+// Anjan kumar sripati panditaradhyula (G01407403)
 
 // demo
-
 
 pipeline {
     agent any
     environment {
-        DOCKERHUB_PASS = credentials('dockerhubcred')
-        DOCKER_TAG = "latest"
-        def dateTag = new Date().format("yyyyMMdd-HHmmss")
+        // Environment variables for Docker credentials
+        DOCKERHUB_CRED_ID = 'dockerhubcred' // The ID of the Docker credentials in Jenkins
+        // Docker image tag based on the current timestamp
+        IMAGE_TAG = "${new Date().format('yyyyMMddHHmmss')}"
+        // Docker image repository name
+        IMAGE_REPO = 'swe645as3'
+        // Docker Hub username environment variable
+        DOCKERHUB_USER = ''
+        // Docker Hub password environment variable
+        DOCKERHUB_PASS = ''
     }
     stages {
-              stage('Checkout code') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build JAR') {
+        stage('Build JAR with Maven') {
             steps {
-               dir('SWE645AS3') {
-                sh 'mvn clean package -DskipTests'
-               }
+                dir('SWE645AS3') {
+                    sh 'mvn clean package -DskipTests'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('', DOCKER_CRED_ID) {
-                        def app = docker.build("${DOCKER_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}", '-f Dockerfile .')
+                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
+                        sh "echo $DOCKERHUB_PASS | docker login --username $DOCKERHUB_USER --password-stdin"
+                        sh "docker build -t ${IMAGE_REPO}:${IMAGE_TAG} ."
                     }
                 }
             }
@@ -42,22 +49,27 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry('', DOCKER_CRED_ID) {
-                        def app = docker.image("${DOCKER_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}")
-                        app.push()
+                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
+                        sh "docker push ${IMAGE_REPO}:${IMAGE_TAG}"
                     }
                 }
             }
         }
-        stage("Deploying to Rancher as single pod") {
-            steps {                                  
-                  sh 'kubectl set image deployment/studentsurvey-pipeline container-0=suresh999/swe645as3:${dateTag} -n default'         
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    // Assuming you have 'kubectl' installed and configured on your Jenkins agent
+                    sh "kubectl set image deployment/studentsurvey ${IMAGE_REPO}=${IMAGE_REPO}:${IMAGE_TAG} --record"
+                    // Replace 'studentsurvey' with your actual deployment name
+                }
             }
         }
-        stage("Deploying to Rancher with load balancer") {
-            steps { 
-                sh 'kubectl set image deployment/studentsurvey-lb container-0=suresh999/swe645as3:${dateTag} -n default'
-            }
+    }
+    post {
+        always {
+            // Log out from Docker Hub
+            sh "docker logout"
         }
     }
 }
