@@ -1,21 +1,10 @@
-// Group Members:
-// Suresh Ande (G01381683)
-// Chandrashakar Gudipally (G01410349)
-// Abhishek Darana (G01408181)
-// Anjan kumar sripati panditaradhyula (G01407403)
-
-// Demo
-
 pipeline {
     agent any
 
     environment {
-        // Set the Docker Hub credentials ID
         DOCKERHUB_CRED_ID = 'dockerhubcred'
-        // Define the image name and tag
         IMAGE_NAME = 'swe645as3'
         IMAGE_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        // Define the Docker registry
         DOCKER_REGISTRY = 'suresh999'
     }
 
@@ -28,7 +17,8 @@ pipeline {
 
         stage('Build JAR with Maven') {
             steps {
-                dir('SWE645AS3') {
+                // Assuming pom.xml is also inside SWE645AS3/SWE645AS3
+                dir('SWE645AS3/SWE645AS3') {
                     sh 'mvn clean package -DskipTests'
                 }
             }
@@ -39,8 +29,9 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
                         sh "echo $DOCKERHUB_PASS | docker login --username $DOCKERHUB_USER --password-stdin"
-                        // Point to the Dockerfile inside the SWE645AS3 directory
-                        sh "docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f SWE645AS3/Dockerfile SWE645AS3"
+                        // Building the Docker image from the SWE645AS3 directory
+                        // Assuming the Dockerfile is located in SWE645AS3/SWE645AS3
+                        sh "docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f SWE645AS3/SWE645AS3/Dockerfile ."
                     }
                 }
             }
@@ -56,22 +47,21 @@ pipeline {
             }
         }
 
-         stage("Deploying to Rancher as single pod") {
-    steps {                                  
-        sh "kubectl set image deployment/studentsurvey-pipeline container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"         
-    }
-}
-stage("Deploying to Rancher with load balancer") {
-    steps { 
-        sh "kubectl set image deployment/studentsurvey-lb container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"
-    }
-}
+        stage("Deploying to Rancher as single pod") {
+            steps {
+                sh "kubectl set image deployment/studentsurvey-pipeline container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"
+            }
+        }
 
+        stage("Deploying to Rancher with load balancer") {
+            steps {
+                sh "kubectl set image deployment/studentsurvey-lb container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"
+            }
+        }
     }
 
     post {
         always {
-            // Logout from Docker after the build process
             sh "docker logout"
         }
     }
