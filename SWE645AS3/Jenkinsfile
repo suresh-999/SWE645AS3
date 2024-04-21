@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     // Ensure you're in the correct directory and specify the path to the Dockerfile
-                    dir('swe645') { // Change to the directory containing the Dockerfile
+                    dir('SWE645AS3') { // Change to the directory containing the Dockerfile
                         docker.withRegistry('', registryCredential) {
                             def app = docker.build("suresh999/swe645as3:${dateTag}", '-f Dockerfile --no-cache .')
                             app.push()
