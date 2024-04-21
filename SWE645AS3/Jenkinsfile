@@ -1,78 +1,48 @@
-// Group Members:
-// Suresh Ande (G01381683)
-// Chandrashakar Gudipally (G01410349)
-// Abhishek Darana (G01408181)
-// Anjan kumar sripati panditaradhyula (G01407403)
-
-// Demo
-
-pipeline {
-    agent any
-
+pipeline{
+    
     environment {
-        // Set the Docker Hub credentials ID
-        DOCKERHUB_CRED_ID = 'dockerhubcred'
-        // Define the image name and tag
-        IMAGE_NAME = 'swe645as3'
-        IMAGE_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        // Define the Docker registry
-        DOCKER_REGISTRY = 'suresh999'
+        registry = "suresh999"
+        registryCredential = 'dockerhubcred'
+        def dateTag = new Date().format("yyyyMMdd-HHmmss")
+	}
+agent any
+    tools{
+        maven 'Maven 3.8.6'
     }
-
-    stages {
-        stage('Checkout Code') {
-            steps {
-                checkout scm
+    stages{
+     stage('Maven clean & Install'){
+        steps{
+            script{
+                sh 'mvn clean'
+                sh 'mvn install'
             }
         }
-
-        stage('Build JAR with Maven') {
-            steps {
-                dir('SWE645AS3') {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
-                        sh "echo $DOCKERHUB_PASS | docker login --username $DOCKERHUB_USER --password-stdin"
-                        // Point to the Dockerfile inside the SWE645AS3 directory
-                        sh "docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f SWE645AS3/Dockerfile SWE645AS3"
+     }
+     stage('Build Docker Image and Push'){
+        steps{
+            script {
+                  docker.withRegistry('',registryCredential) {
+                        def image = docker.build('suresh999/swe645as3:'+ dateTag, '. --no-cache')
+                        docker.withRegistry('',registryCredential) {
+                            image.push()
+                        }
                     }
-                }
             }
         }
-
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CRED_ID, passwordVariable: 'DOCKERHUB_PASS', usernameVariable: 'DOCKERHUB_USER')]) {
-                        sh "docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-                    }
-                }
+     }
+      stage('Deploying to single node in Rancher'){
+        steps{
+            script {
+                  sh 'kubectl set image deployment/deploy1 container-0=suresh999/swe645as3'+dateTag
+                  sh 'kubectl set image deployment/deploy-lb container-0=suresh999/swe645as3'+dateTag
             }
         }
-
-         stage("Deploying to Rancher as single pod") {
-    steps {                                  
-        sh "kubectl set image deployment/studentsurvey-pipeline container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"         
-    }
-}
-stage("Deploying to Rancher with load balancer") {
-    steps { 
-        sh "kubectl set image deployment/studentsurvey-lb container-0=${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -n default"
-    }
-}
-
-    }
-
-    post {
-        always {
-            // Logout from Docker after the build process
-            sh "docker logout"
-        }
-    }
+     }
+     }
+ 
+  post {
+	  always {
+			sh 'docker logout'
+		}
+	}    
 }
