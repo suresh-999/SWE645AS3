@@ -1,48 +1,50 @@
-pipeline{
+pipeline {
     
     environment {
-        registry = "suresh999"
+        // Define Docker Hub registry URL if needed, or leave empty if using Docker Hub's default registry
+        registry = ''
         registryCredential = 'dockerhubcred'
-        def dateTag = new Date().format("yyyyMMdd-HHmmss")
-	}
-agent any
-    tools{
+        dateTag = new Date().format("yyyyMMdd-HHmmss")
+    }
+    agent any
+    tools {
         maven 'Maven 3.8.6'
     }
-    stages{
-     stage('Maven clean & Install'){
-        steps{
-            script{
-                sh 'mvn clean'
-                sh 'mvn install'
-            }
-        }
-     }
-     stage('Build Docker Image and Push'){
-        steps{
-            script {
-                  docker.withRegistry('',registryCredential) {
-                        def image = docker.build('suresh999/swe645as3:'+ dateTag, '. --no-cache')
-                        docker.withRegistry('',registryCredential) {
-                            image.push()
-                        }
+    stages {
+        stage('Maven clean & Install') {
+            steps {
+                script {
+                    // Change to the directory containing the pom.xml
+                    dir('SWE645AS3') {
+                        sh 'mvn clean install'
                     }
+                }
             }
         }
-     }
-      stage('Deploying to single node in Rancher'){
-        steps{
-            script {
-                  sh 'kubectl set image deployment/deploy1 container-0=suresh999/swe645as3'+dateTag
-                  sh 'kubectl set image deployment/deploy-lb container-0=suresh999/swe645as3'+dateTag
+        stage('Build Docker Image and Push') {
+            steps {
+                script {
+                    // You don't have to mention the Docker image name in the registry variable
+                    docker.withRegistry(registry, registryCredential) {
+                        def app = docker.build("suresh999/swe645as3:${dateTag}", '--no-cache .')
+                        app.push()
+                    }
+                }
             }
         }
-     }
-     }
- 
-  post {
-	  always {
-			sh 'docker logout'
-		}
-	}    
+        stage('Deploying to single node in Rancher') {
+            steps {
+                script {
+                    // Use the full image name including the tag for deployment
+                    sh "kubectl set image deployment/deploy1 container-0=suresh999/swe645as3:${dateTag}"
+                    sh "kubectl set image deployment/deploy-lb container-0=suresh999/swe645as3:${dateTag}"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }    
 }
