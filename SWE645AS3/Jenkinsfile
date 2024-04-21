@@ -2,7 +2,7 @@ pipeline {
     
     environment {
         // Define Docker Hub registry URL if needed, or leave empty if using Docker Hub's default registry
-        registry = ''
+        //registry = ''
         registryCredential = 'dockerhubcred'
         dateTag = new Date().format("yyyyMMdd-HHmmss")
     }
@@ -25,7 +25,7 @@ pipeline {
             steps {
                 script {
                     // You don't have to mention the Docker image name in the registry variable
-                    docker.withRegistry(registry, registryCredential) {
+                    docker.withRegistry('', registryCredential) {
                         def app = docker.build("suresh999/swe645as3:${dateTag}", '--no-cache .')
                         app.push()
                     }
